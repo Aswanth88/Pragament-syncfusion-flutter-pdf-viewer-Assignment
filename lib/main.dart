@@ -1,9 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'dart:math';
+import 'package:weeklynuget/subject_detail_page.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -20,253 +19,37 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Represents Homepage for Navigation
 class HomePage extends StatefulWidget {
   @override
   _HomePage createState() => _HomePage();
 }
 
 class _HomePage extends State<HomePage> {
-  final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
-  final PdfViewerController _pdfViewerController = PdfViewerController();
-  Uint8List? _documentBytes;
-  OverlayEntry? _overlayEntry;
-  double yOffset = 0.0;
-  double xOffset = 0.0;
-  final Color _contextMenuColor = const Color(0xFFFFFFFF);
-  final Color _textColor = const Color(0xFF000000);
+  Map<String, dynamic> subjects = {};
+  Random random = Random();
 
   @override
   void initState() {
-    getPdfBytes();
     super.initState();
+    getSubjectsFromApi();
   }
 
-  ///Get the PDF document as bytes from local project asset
-  void getPdfBytes() async {
-    final ByteData bytes =
-        await DefaultAssetBundle.of(context).load('assets/teluguchap1.pdf');
-    _documentBytes = bytes.buffer.asUint8List();
-    setState(() {});
-  }
+  Future<void> getSubjectsFromApi() async {
+    try {
+      final response = await http.get(Uri.parse(
+          'https://www.eschool2go.org/api/v1/project/ba7ea038-2e2d-4472-a7c2-5e4dad7744e3'));
 
-  ///Get the PDF document as bytes from internet URL
-  void getPdfBytesFromWeb() async {
-    _documentBytes = await http.readBytes(Uri.parse(
-        'https://cdn.syncfusion.com/content/PDFViewer/flutter-succinctly.pdf'));
-    setState(() {});
-  }
-
-  ///Add the annotation in PDF document
-  Widget _addAnnotation(String? annotationType, String? selectedText) {
-    return SizedBox(
-      height: 30,
-      width: 100,
-      child: RawMaterialButton(
-        onPressed: () async {
-          _checkAndCloseContextMenu();
-          await Clipboard.setData(ClipboardData(text: selectedText!));
-          _drawAnnotation(annotationType);
-        },
-        child: Text(
-          annotationType!,
-          style: TextStyle(
-              color: _textColor,
-              fontSize: 10,
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w400),
-        ),
-      ),
-    );
-  }
-
-  ///Draw the annotation in PDF document
-  void _drawAnnotation(String? annotationType) {
-    final PdfDocument document = PdfDocument(inputBytes: _documentBytes);
-    switch (annotationType) {
-      case 'Highlight':
-        {
-          _pdfViewerKey.currentState!
-              .getSelectedTextLines()
-              .forEach((pdfTextLine) {
-            final PdfPage _page = document.pages[pdfTextLine.pageNumber];
-            final PdfRectangleAnnotation rectangleAnnotation =
-                PdfRectangleAnnotation(
-                    pdfTextLine.bounds, 'Highlight Annotation',
-                    author: 'Syncfusion',
-                    color: PdfColor.fromCMYK(0, 0, 255, 0),
-                    innerColor: PdfColor.fromCMYK(0, 0, 255, 0),
-                    opacity: 0.5);
-            _page.annotations.add(rectangleAnnotation);
-            _page.annotations.flattenAllAnnotations();
-            xOffset = _pdfViewerController.scrollOffset.dx;
-            yOffset = _pdfViewerController.scrollOffset.dy;
-          });
-          final List<int> bytes = document.saveSync();
-          setState(() {
-            _documentBytes = Uint8List.fromList(bytes);
-          });
-        }
-        break;
-      case 'Underline':
-        {
-          _pdfViewerKey.currentState!
-              .getSelectedTextLines()
-              .forEach((pdfTextLine) {
-            final PdfPage _page = document.pages[pdfTextLine.pageNumber];
-            final PdfLineAnnotation lineAnnotation = PdfLineAnnotation(
-              [
-                pdfTextLine.bounds.left.toInt(),
-                (document.pages[pdfTextLine.pageNumber].size.height -
-                        pdfTextLine.bounds.bottom)
-                    .toInt(),
-                pdfTextLine.bounds.right.toInt(),
-                (document.pages[pdfTextLine.pageNumber].size.height -
-                        pdfTextLine.bounds.bottom)
-                    .toInt()
-              ],
-              'Underline Annotation',
-              author: 'Syncfusion',
-              innerColor: PdfColor(0, 255, 0),
-              color: PdfColor(0, 255, 0),
-            );
-            _page.annotations.add(lineAnnotation);
-            _page.annotations.flattenAllAnnotations();
-            xOffset = _pdfViewerController.scrollOffset.dx;
-            yOffset = _pdfViewerController.scrollOffset.dy;
-          });
-          final List<int> bytes = document.saveSync();
-          setState(() {
-            _documentBytes = Uint8List.fromList(bytes);
-          });
-        }
-        break;
-      case 'Strikethrough':
-        {
-          _pdfViewerKey.currentState!
-              .getSelectedTextLines()
-              .forEach((pdfTextLine) {
-            final PdfPage _page = document.pages[pdfTextLine.pageNumber];
-            final PdfLineAnnotation lineAnnotation = PdfLineAnnotation(
-              [
-                pdfTextLine.bounds.left.toInt(),
-                ((document.pages[pdfTextLine.pageNumber].size.height -
-                            pdfTextLine.bounds.bottom) +
-                        (pdfTextLine.bounds.height / 2))
-                    .toInt(),
-                pdfTextLine.bounds.right.toInt(),
-                ((document.pages[pdfTextLine.pageNumber].size.height -
-                            pdfTextLine.bounds.bottom) +
-                        (pdfTextLine.bounds.height / 2))
-                    .toInt()
-              ],
-              'Strikethrough Annotation',
-              author: 'Syncfusion',
-              innerColor: PdfColor(255, 0, 0),
-              color: PdfColor(255, 0, 0),
-            );
-            _page.annotations.add(lineAnnotation);
-            _page.annotations.flattenAllAnnotations();
-            xOffset = _pdfViewerController.scrollOffset.dx;
-            yOffset = _pdfViewerController.scrollOffset.dy;
-          });
-          final List<int> bytes = document.saveSync();
-          setState(() {
-            _documentBytes = Uint8List.fromList(bytes);
-          });
-        }
-        break;
-    }
-  }
-
-  /// Show Context menu with annotation options.
-  void _showContextMenu(
-    BuildContext context,
-    PdfTextSelectionChangedDetails? details,
-  ) {
-    final RenderBox? renderBoxContainer =
-        context.findRenderObject()! as RenderBox;
-    if (renderBoxContainer != null) {
-      const double _kContextMenuHeight = 90;
-      const double _kContextMenuWidth = 100;
-      const double _kHeight = 18;
-      final Offset containerOffset = renderBoxContainer.localToGlobal(
-        renderBoxContainer.paintBounds.topLeft,
-      );
-      if (details != null &&
-              containerOffset.dy < details.globalSelectedRegion!.topLeft.dy ||
-          (containerOffset.dy <
-                  details!.globalSelectedRegion!.center.dy -
-                      (_kContextMenuHeight / 2) &&
-              details.globalSelectedRegion!.height > _kContextMenuWidth)) {
-        double top = 0.0;
-        double left = 0.0;
-        final Rect globalSelectedRect = details.globalSelectedRegion!;
-        if ((globalSelectedRect.top) > MediaQuery.of(context).size.height / 2) {
-          top = globalSelectedRect.topLeft.dy +
-              details.globalSelectedRegion!.height +
-              _kHeight;
-          left = globalSelectedRect.bottomLeft.dx;
-        } else {
-          top = globalSelectedRect.height > _kContextMenuWidth
-              ? globalSelectedRect.center.dy - (_kContextMenuHeight / 2)
-              : globalSelectedRect.topLeft.dy +
-                  details.globalSelectedRegion!.height +
-                  _kHeight;
-          left = globalSelectedRect.height > _kContextMenuWidth
-              ? globalSelectedRect.center.dx - (_kContextMenuWidth / 2)
-              : globalSelectedRect.bottomLeft.dx;
-        }
-        final OverlayState? _overlayState =
-            Overlay.of(context, rootOverlay: true);
-        _overlayEntry = OverlayEntry(
-          builder: (context) => Positioned(
-            top: top,
-            left: left,
-            child: Container(
-              decoration: BoxDecoration(
-                color: _contextMenuColor,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color.fromRGBO(0, 0, 0, 0.14),
-                    blurRadius: 2,
-                    offset: Offset(0, 0),
-                  ),
-                  BoxShadow(
-                    color: Color.fromRGBO(0, 0, 0, 0.12),
-                    blurRadius: 2,
-                    offset: Offset(0, 2),
-                  ),
-                  BoxShadow(
-                    color: Color.fromRGBO(0, 0, 0, 0.2),
-                    blurRadius: 3,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
-              constraints: const BoxConstraints.tightFor(
-                  width: _kContextMenuWidth, height: _kContextMenuHeight),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _addAnnotation('Highlight', details.selectedText),
-                  _addAnnotation('Underline', details.selectedText),
-                  _addAnnotation('Strikethrough', details.selectedText),
-                ],
-              ),
-            ),
-          ),
-        );
-        _overlayState?.insert(_overlayEntry!);
+      if (response.statusCode == 200) {
+        final subjectData = json.decode(response.body);
+        setState(() {
+          subjects = subjectData;
+        });
+      } else {
+        print('Failed to fetch subjects: ${response.statusCode}');
+        print('Response body: ${response.body}');
       }
-    }
-  }
-
-  /// Check and close the context menu.
-  void _checkAndCloseContextMenu() {
-    if (_overlayEntry != null) {
-      _overlayEntry?.remove();
-      _overlayEntry = null;
+    } catch (e) {
+      print('Error fetching subjects: $e');
     }
   }
 
@@ -274,26 +57,106 @@ class _HomePage extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Syncfusion Flutter PDF Viewer'),
+        title: Text('Subjects List'),
       ),
-      body: _documentBytes != null
-          ? SfPdfViewer.memory(
-              _documentBytes!,
-              key: _pdfViewerKey,
-              controller: _pdfViewerController,
-              onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                _pdfViewerController.jumpTo(xOffset: xOffset, yOffset: yOffset);
-              },
-              onTextSelectionChanged: (PdfTextSelectionChangedDetails details) {
-                if (details.selectedText == null && _overlayEntry != null) {
-                  _checkAndCloseContextMenu();
-                } else if (details.selectedText != null &&
-                    _overlayEntry == null) {
-                  _showContextMenu(context, details);
-                }
-              },
-            )
-          : Container(),
+      body: SingleChildScrollView(
+        child: buildSubjectsGrid(subjects),
+      ),
+    );
+  }
+
+  Widget buildSubjectsGrid(Map<String, dynamic> subjects) {
+    if (subjects.isEmpty) {
+      return Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    List<Widget> subjectWidgets = [];
+
+    subjects.forEach((key, value) {
+      final String subjectName = value['name'];
+      final Color randomColor = Color.fromRGBO(
+        random.nextInt(256),
+        random.nextInt(256),
+        random.nextInt(256),
+        1.0,
+      );
+
+      subjectWidgets.add(
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SubjectDetailPage(
+                  subjectName: subjectName,
+                  iconColor: randomColor,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            width: MediaQuery.of(context).size.width / 2,
+            height: MediaQuery.of(context).size.height / 4,
+            padding: EdgeInsets.all(10.0),
+            margin: EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Colors.white,
+                width: 2.0,
+              ),
+              borderRadius: BorderRadius.circular(10.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.5),
+                  spreadRadius: 2,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: randomColor,
+                  ),
+                  child: Center(
+                    child: Text(
+                      subjectName.isNotEmpty ? subjectName[0] : '',
+                      style: TextStyle(
+                        fontSize: 24.0,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10.0),
+                Text(
+                  subjectName,
+                  style: TextStyle(
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+
+    return GridView.count(
+      crossAxisCount: 2,
+      childAspectRatio: 1,
+      physics: NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      children: subjectWidgets,
     );
   }
 }
