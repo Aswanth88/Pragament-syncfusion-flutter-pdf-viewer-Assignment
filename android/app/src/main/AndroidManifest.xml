@@ -1,11 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
     <application
         android:label="weeklynuget"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+
 <provider
     android:name="androidx.core.content.FileProvider"
-    android:authorities="com.example.weeklynuget"
+    android:authorities="com.example.weeklynuget.flutter_downloader.provider"
     android:exported="false"
     android:grantUriPermissions="true">
     <meta-data

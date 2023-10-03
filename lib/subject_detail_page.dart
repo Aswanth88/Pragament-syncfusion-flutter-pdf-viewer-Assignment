@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:path_provider/path_provider.dart'; // Import the path_provider package
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'pdf_viewer_page.dart';
 
@@ -38,7 +41,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
     if (widget.subjectName == 'Environmental Education') {
       fetchChapterUnits();
     }
-    FlutterDownloader.initialize(); // Initialize the downloader
+    FlutterDownloader.initialize();
   }
 
   Future<void> fetchChapterUnits() async {
@@ -51,19 +54,18 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
       if (data is List) {
         setState(() {
           chapterUnits = data.map((unit) {
-            final title = unit['title'] ?? ''; // Handle potential null value
-            final downloadUrl = unit['download_url'] ?? ''; // Handle potential null value
-            final pdfUrl = unit['id'] ?? ''; // Use 'id' as PDF URL
+            final title = unit['title'] ?? '';
+            final downloadUrl = unit['download_url'] ?? '';
+            final pdfUrl = unit['id'] ?? '';
             return ChapterUnit(
               title: title,
               downloadUrl: downloadUrl,
-              pdfUrl: pdfUrl, // Use 'id' as PDF URL
+              pdfUrl: pdfUrl,
             );
           }).toList();
         });
       }
     } else {
-      // Handle errors here
       print('Failed to fetch data');
     }
   }
@@ -79,89 +81,121 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
               child: CircularProgressIndicator(),
             )
           : ListView.builder(
-  itemCount: chapterUnits.length,
-  itemBuilder: (context, index) {
-    final chapterUnit = chapterUnits[index];
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10), // Add border radius
-        color: Colors.white, // Add a background color
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3), // Add shadow
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            chapterUnit.title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  // Handle downloading the chapter PDF here
-                  _downloadPDF(chapterUnit.pdfUrl, chapterUnit.title);
-                },
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.green, // Green color for download button
-                ),
-                child: Text('Download PDF'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  // Handle opening the PDF viewer here
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PdfViewerPage(
-                        pdfUrl: chapterUnit.pdfUrl,
+              itemCount: chapterUnits.length,
+              itemBuilder: (context, index) {
+                final chapterUnit = chapterUnits[index];
+                return Container(
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.5),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: Offset(0, 3),
                       ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.grey, // Grey color for view button
-                ),
-                child: Text('View PDF'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  },
-)
-
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chapterUnit.title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              _downloadPDF(
+                                  chapterUnit.pdfUrl, chapterUnit.title);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              primary: Colors.green,
+                            ),
+                            child: Text('Download PDF'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PdfViewerPage(
+                                    pdfUrl: chapterUnit.pdfUrl,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              primary: Colors.grey,
+                            ),
+                            child: Text('View PDF'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 
   Future<void> _downloadPDF(String pdfUrl, String title) async {
-    final directory = await getDownloadsDirectory(); // Use getDownloadsDirectory from path_provider
-    if (directory != null) {
-      final taskId = await FlutterDownloader.enqueue(
-        url: pdfUrl,
-        savedDir: directory.path,
-        fileName: '$title.pdf',
-        showNotification: true,
-        openFileFromNotification: true,
-      );
+  try {
+    final output = await getExternalStorageDirectory();
+    RegExp pathToDownloads = RegExp(r'.+0\/');
+    final outputPath =
+        '${pathToDownloads.stringMatch(output!.path).toString()}Download';
+    final filePath = '$outputPath/$title.pdf';
+
+    // Check if storage permission is not granted
+    final status = await Permission.storage.request();
+    if (status.isGranted) {
+      // Permission granted, proceed with download
+      final response = await http.get(Uri.parse(pdfUrl));
+      if (response.statusCode == 200) {
+        final pdfBytes = response.bodyBytes;
+        final file = File(filePath);
+        await file.writeAsBytes(pdfBytes);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File has been downloaded'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        print('Failed to download PDF');
+      }
+    } else if (status.isPermanentlyDenied) {
+      // Permission permanently denied by the user, show a dialog or navigate to app settings
+      openAppSettings();
     } else {
-      // Handle the case where the downloads directory is null
-      print('Downloads directory is null');
+      // Permission denied by the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Storage permission denied'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
+  } catch (error) {
+    print('Error: $error');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('An error occurred while downloading the PDF'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
+}
+
 }

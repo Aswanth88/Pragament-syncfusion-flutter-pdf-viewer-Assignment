@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math';
 import 'package:weeklynuget/subject_detail_page.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
 
-void main() {
-  runApp(MaterialApp(
-    home: MyApp(),
-  ));
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Add this line
+  await FlutterDownloader.initialize(debug: true); // Initialize Flutter Downloader
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
